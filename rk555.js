@@ -3,6 +3,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentPage = 1;
     let totalItems = 0;
     let isLoading = false;
+    let sheetData = [];
+    let displayedItems = [];
     let videos = [];
 
     const loadingElement = document.getElementById('loading');
@@ -13,44 +15,48 @@ document.addEventListener('DOMContentLoaded', function () {
     const allButton = document.getElementById('allButton');
     const rohitButton = document.getElementById('rohitButton');
 
-    let sheetData = []; // Store the fetched Google Sheets data
+
+ fetchData('https://docs.google.com/spreadsheets/d/1JPptsNfP9Qw0ndxXq8DVd8LW6mCQm_aiO98iVNvs53M/gviz/tq?tqx=out:csv&sheet=Sheet1&tq=SELECT *');
+
+
 
     allButton.addEventListener('click', function () {
         showLoading();
-        fetchAndDisplayData('https://docs.google.com/spreadsheets/d/1JPptsNfP9Qw0ndxXq8DVd8LW6mCQm_aiO98iVNvs53M/gviz/tq?tqx=out:csv&sheet=Sheet1&tq=SELECT *');
+        currentPage = 1;
+        displayedItems = [];
+        fetchData('https://docs.google.com/spreadsheets/d/1JPptsNfP9Qw0ndxXq8DVd8LW6mCQm_aiO98iVNvs53M/gviz/tq?tqx=out:csv&sheet=Sheet1&tq=SELECT *');
     });
 
     rohitButton.addEventListener('click', function () {
         showLoading();
-        fetchAndDisplayData("https://docs.google.com/spreadsheets/d/1JPptsNfP9Qw0ndxXq8DVd8LW6mCQm_aiO98iVNvs53M/gviz/tq?tqx=out:csv&sheet=Sheet1&tq=SELECT * WHERE B = 'rohit'");
+        currentPage = 1;
+        displayedItems = [];
+        fetchData("https://docs.google.com/spreadsheets/d/1JPptsNfP9Qw0ndxXq8DVd8LW6mCQm_aiO98iVNvs53M/gviz/tq?tqx=out:csv&sheet=Sheet1&tq=SELECT * WHERE B = 'rohit'");
     });
 
-    // Fetch suggestions when the page loads
     fetchSheetData();
 
     searchInput.addEventListener('focus', function () {
-        // Show suggestions only when the search input is focused and has at least one character
         if (searchInput.value.trim().length >= 1) {
             updateSuggestions(searchInput.value.trim().toLowerCase());
         }
     });
 
     searchInput.addEventListener('input', function () {
-        // Update suggestions dynamically as the user types
         updateSuggestions(searchInput.value.trim().toLowerCase());
     });
 
     closeButton.addEventListener('click', function () {
-        // Hide suggestions when the "Close" button is clicked
         suggestionsList.style.display = 'none';
         searchInput.blur();
     });
 
     clearButton.addEventListener('click', function () {
-        // Clear the search input
         searchInput.value = '';
         suggestionsList.style.display = 'none';
-        fetchAndDisplayData('https://docs.google.com/spreadsheets/d/1JPptsNfP9Qw0ndxXq8DVd8LW6mCQm_aiO98iVNvs53M/gviz/tq?tqx=out:csv&sheet=Sheet1&tq=SELECT *');
+        currentPage = 1;
+        displayedItems = [];
+        fetchData('https://docs.google.com/spreadsheets/d/1JPptsNfP9Qw0ndxXq8DVd8LW6mCQm_aiO98iVNvs53M/gviz/tq?tqx=out:csv&sheet=Sheet1&tq=SELECT *');
     });
 
     function showLoading() {
@@ -68,8 +74,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function fetchSheetData() {
         const sheetUrl = 'https://docs.google.com/spreadsheets/d/1ljFYrBKFviYTJ66P_WJ4z3SSDFZRqMDd5QwRX77fnBs/gviz/tq?tqx=out:csv&sheet=Sheet1&tq=SELECT *';
-
-        // Make an asynchronous request to the Google Sheets URL
         fetch(sheetUrl)
             .then(response => response.text())
             .then(csvData => {
@@ -80,176 +84,191 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function updateSuggestions(inputValue) {
         if (inputValue === '') {
-            // If the search box is empty, hide the suggestions list
             suggestionsList.style.display = 'none';
             return;
         }
 
         const filteredSuggestions = sheetData
-            .flatMap(row => row.split(',')) // Split each row into individual names
+            .flatMap(row => row.split(','))
             .map(name => name.trim())
             .filter(name => name.toLowerCase().includes(inputValue));
 
-        // Clear existing suggestions
         suggestionsList.innerHTML = '';
-
-        // Display filtered suggestions
         filteredSuggestions.forEach(suggestion => {
             const li = document.createElement('li');
             li.textContent = suggestion;
             li.addEventListener('click', function () {
                 searchInput.value = suggestion;
-                // You can perform further actions here based on the selected suggestion
-                alert(`Selected suggestion: ${suggestion}`);
                 showLoading();
-                fetchAndDisplayData(`https://docs.google.com/spreadsheets/d/1JPptsNfP9Qw0ndxXq8DVd8LW6mCQm_aiO98iVNvs53M/gviz/tq?tqx=out:csv&sheet=Sheet1&tq=SELECT * WHERE B = '${suggestion}'`);
-                // Hide suggestions after clicking on a suggestion
+                currentPage = 1;
+                displayedItems = [];
+                fetchData(`https://docs.google.com/spreadsheets/d/1JPptsNfP9Qw0ndxXq8DVd8LW6mCQm_aiO98iVNvs53M/gviz/tq?tqx=out:csv&sheet=Sheet1&tq=SELECT * WHERE B = '${suggestion}'`);
                 suggestionsList.style.display = 'none';
             });
             suggestionsList.appendChild(li);
         });
 
-        // Show or hide suggestions list based on the presence of filtered suggestions
         suggestionsList.style.display = filteredSuggestions.length > 0 ? 'block' : 'none';
     }
 
-    function fetchAndDisplayData(url) {
+    function fetchData(url) {
         fetch(url)
             .then(response => response.text())
             .then(data => {
                 const rows = data.split('\n').map(row => row.split(','));
-                const mediaContainer = document.querySelector('#mediaContainer');
-                const categories = new Set();
-                const videos = [];
-
-                rows.forEach(item => {
-                    const [id, name, price, urls, description, type, category] = item.map(value => value.replace(/(^"|"$)/g, ''));
-                    categories.add(category.trim().toLowerCase());
-                });
-
-                totalItems = rows.length - 1; // Exclude header row
-
-                // Directly display all items without pagination
-                displayAllItems(rows);
-
-                function displayAllItems(items) {
-                    mediaContainer.innerHTML = ''; // Clear existing content
-
-                    items.forEach(item => {
-                        const [id, name, price, urls, description, type, category] = item.map(value => value.replace(/(^"|"$)/g, ''));
-                        const mediaItem = document.createElement('div');
-                        mediaItem.classList.add('media-item');
-                        mediaItem.classList.add(category.trim().toLowerCase());
-                        mediaContainer.appendChild(mediaItem);
-
-                        if (type.trim().toLowerCase() === 'img') {
-                            const urlsArray = urls.split('+');
-                            const vrMediaGallery = document.createElement('div');
-                            vrMediaGallery.classList.add('vrmedia-gallery');
-
-                            const ulEcommerceGallery = document.createElement('ul');
-                            ulEcommerceGallery.classList.add('ecommerce-gallery');
-                            ulEcommerceGallery.style.listStyle = 'none';
-                            urlsArray.forEach(url => {
-                                const li = document.createElement('li');
-                                li.dataset.fancybox = 'gallery';
-                                li.dataset.src = url.trim();
-                                li.dataset.thumb = url.trim();
-                                li.innerHTML = `<img src="${url.trim()}" alt="${name}">`;
-                                ulEcommerceGallery.appendChild(li);
-                            });
-
-                            vrMediaGallery.appendChild(ulEcommerceGallery);
-                            mediaItem.appendChild(vrMediaGallery);
-
-                            const details = document.createElement('div');
-                            details.classList.add('details');
-                            details.innerHTML = `
-                                <p class="name"><strong>${name}</strong></p>
-                                <p>Description:<br>${description}</p>
-                                <p>Price: ${price}</p>
-                                <button class="buy-btn" onclick="showId('${id}')">Buy Now</button>
-                            `;
-                            mediaItem.appendChild(details);
-                        } else if (type.trim().toLowerCase() === 'video') {
-                            const video = document.createElement('video');
-                            video.src = urls;
-                            video.controls = true;
-                            video.loop = true;
-
-                            videos.push(video);
-                            const details = document.createElement('div');
-                            details.classList.add('details');
-                            details.innerHTML = `
-                                <p class="name"><strong>${name}</strong></p>
-                                <p>Description: ${description}</p>
-                                <p>Price: ${price}</p>
-                                <button class="buy-btn" onclick="showId('${id}')">Buy Now</button>
-                            `;
-                            mediaItem.appendChild(video);
-                            mediaItem.appendChild(details);
-
-                            video.addEventListener('play', function () {
-                                videos.forEach(vid => {
-                                    if (vid !== video) {
-                                        vid.pause();
-                                    }
-                                });
-                            });
-
-                            window.addEventListener('scroll', function () {
-                                const rect = video.getBoundingClientRect();
-                                const isOnScreen = (rect.top >= 0) && (rect.bottom <= window.innerHeight);
-                                const isPlaying = !video.paused && !video.ended && video.currentTime > 0;
-
-                                if (isOnScreen && !isPlaying) {
-                                    video.pause();
-                                } else if (!isOnScreen && isPlaying) {
-                                    video.pause();
-                                }
-                            });
-                        }
-                    });
-
-                    allButton.addEventListener('click', function () {
-                        filterItems('.all');
-                        document.querySelectorAll('.button').forEach(btn => {
-                            btn.style.backgroundColor = '#3498db';
-                            btn.style.color = 'white';
-                        });
-                        this.style.backgroundColor = 'green';
-                        this.style.color = 'black';
-                        pauseAllVideos();
-                    });
-
-                    jQuery(document).ready(function(){
-                        jQuery(".ecommerce-gallery").lightSlider({
-                            gallery: true,
-                            item: 1,
-                            loop: false,
-                            thumbItem: 5,
-                            thumbMargin: 15,
-                        });
-                    });
-                }
-
-                function filterItems(category) {
-                    document.querySelectorAll('.media-item').forEach(item => {
-                        item.style.display = item.classList.contains(category) ? 'block' : 'none';
-                    });
-                }
-
-                function pauseAllVideos() {
-                    videos.forEach(video => {
-                        video.pause();
-                    });
-                }
+                totalItems = rows.length;
+                processItems(rows);
             })
             .catch(error => console.error('Error fetching data:', error));
     }
 
-    // Call the fetchAndDisplayData function with the initial URL
-    fetchAndDisplayData('https://docs.google.com/spreadsheets/d/1JPptsNfP9Qw0ndxXq8DVd8LW6mCQm_aiO98iVNvs53M/gviz/tq?tqx=out:csv&sheet=Sheet1&tq=SELECT *');
+    function processItems(items) {
+        const mediaContainer = document.querySelector('#mediaContainer');
+        const newItems = items.slice(itemsPerPage * (currentPage - 1), itemsPerPage * currentPage);
+
+
+
+
+
+
+
+
+        displayedItems = displayedItems.concat(newItems);
+
+        if (displayedItems.length === 0) {
+            mediaContainer.innerHTML = '<p>No items to display.</p>';
+        } else {
+            displayItems(displayedItems);
+        }
+
+        if (displayedItems.length < totalItems) {
+            currentPage++;
+        }
+    }
+
+    function displayItems(items) {
+        const mediaContainer = document.querySelector('#mediaContainer');
+        mediaContainer.innerHTML = '';
+
+        items.forEach(item => {
+            const [id, name, price, urls, description, type, category] = item.map(value => value.replace(/(^"|"$)/g, ''));
+            const mediaItem = document.createElement('div');
+            mediaItem.classList.add('media-item');
+            mediaItem.classList.add(category.trim().toLowerCase());
+            mediaContainer.appendChild(mediaItem);
+
+            if (type.trim().toLowerCase() === 'img') {
+                const urlsArray = urls.split('+');
+                const vrMediaGallery = document.createElement('div');
+                vrMediaGallery.classList.add('vrmedia-gallery');
+
+                const ulEcommerceGallery = document.createElement('ul');
+                ulEcommerceGallery.classList.add('ecommerce-gallery');
+                ulEcommerceGallery.style.listStyle = 'none';
+                urlsArray.forEach(url => {
+                    const li = document.createElement('li');
+                    li.dataset.fancybox = 'gallery';
+                    li.dataset.src = url.trim();
+                    li.dataset.thumb = url.trim();
+                    li.innerHTML = `<img src="${url.trim()}" alt="${name}">`;
+                    ulEcommerceGallery.appendChild(li);
+                });
+
+                vrMediaGallery.appendChild(ulEcommerceGallery);
+                mediaItem.appendChild(vrMediaGallery);
+
+                const details = document.createElement('div');
+                details.classList.add('details');
+                details.innerHTML = `
+                    <p class="name"><strong>${name}</strong></p>
+                    <p>Description:<br>${description}</p>
+                    <p>Price: ${price}</p>
+                    <button class="buy-btn" onclick="showId('${id}')">Buy Now</button>
+                `;
+                mediaItem.appendChild(details);
+            } else if (type.trim().toLowerCase() === 'video') {
+                const video = document.createElement('video');
+                video.src = urls;
+                video.controls = true;
+                video.loop = true;
+
+                videos.push(video);
+                const details = document.createElement('div');
+                details.classList.add('details');
+                details.innerHTML = `
+                    <p class="name"><strong>${name}</strong></p>
+                    <p>Description: ${description}</p>
+                    <p>Price: ${price}</p>
+                    <button class="buy-btn" onclick="showId('${id}')">Buy Now</button>
+                `;
+                mediaItem.appendChild(video);
+                mediaItem.appendChild(details);
+
+                video.addEventListener('play', function () {
+                    videos.forEach(vid => {
+                        if (vid !== video) {
+                            vid.pause();
+                        }
+                    });
+                });
+
+                window.addEventListener('scroll', function () {
+                    const rect = video.getBoundingClientRect();
+                    const isOnScreen = (rect.top >= 0) && (rect.bottom <= window.innerHeight);
+                    const isPlaying = !video.paused && !video.ended && video.currentTime > 0;
+
+                    if (isOnScreen && !isPlaying) {
+                        video.pause();
+                    } else if (!isOnScreen && isPlaying) {
+                        video.pause();
+                    }
+                });
+            }
+        });
+
+        allButton.addEventListener('click', function () {
+            filterItems('.all');
+            document.querySelectorAll('.button').forEach(btn => {
+                btn.style.backgroundColor = '#3498db';
+                btn.style.color = 'white';
+            });
+            this.style.backgroundColor = 'green';
+            this.style.color = 'black';
+            pauseAllVideos();
+        });
+
+        jQuery(document).ready(function(){
+            jQuery(".ecommerce-gallery").lightSlider({
+                gallery: true,
+                item: 1,
+                loop: false,
+                thumbItem: 5,
+                thumbMargin: 15,
+            });
+        });
+    }
+
+    function filterItems(category) {
+        document.querySelectorAll('.media-item').forEach(item => {
+            item.style.display = item.classList.contains(category) ? 'block' : 'none';
+        });
+    }
+
+    function pauseAllVideos() {
+        videos.forEach(video => {
+            video.pause();
+        });
+    }
+
+    // Infinite scrolling logic
+    window.addEventListener('scroll', function () {
+        if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+            if (!isLoading && displayedItems.length < totalItems) {
+                showLoading();
+                fetchData('https://docs.google.com/spreadsheets/d/1JPptsNfP9Qw0ndxXq8DVd8LW6mCQm_aiO98iVNvs53M/gviz/tq?tqx=out:csv&sheet=Sheet1&tq=SELECT *');
+            }
+        }
+    });
 });
 
 function showId(id) {
